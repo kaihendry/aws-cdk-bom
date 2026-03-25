@@ -1,19 +1,21 @@
-from aws_cdk import (
-    # Duration,
-    Stack,
-    # aws_sqs as sqs,
-)
+import aws_cdk as cdk
 from constructs import Construct
+from enterprise_foo_construct import FooConstruct
+from enterprise_bar_construct import BarConstruct
+from aws_cdk_bom.aspects import BomAspect
 
-class AwsCdkBomStack(Stack):
+# Approved is a set of actual class objects.
+# Importing them here means this file has a hard dependency on the approved packages —
+# you cannot approve a construct you haven't installed.
+APPROVED_CONSTRUCT_TYPES: set[type] = {FooConstruct, BarConstruct}
+
+
+class AwsCdkBomStack(cdk.Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # The code that defines your stack goes here
+        FooConstruct(self, "Foo")
+        BarConstruct(self, "Bar")
 
-        # example resource
-        # queue = sqs.Queue(
-        #     self, "AwsCdkBomQueue",
-        #     visibility_timeout=Duration.seconds(300),
-        # )
+        cdk.Aspects.of(self).add(BomAspect(approved=APPROVED_CONSTRUCT_TYPES))
