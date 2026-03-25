@@ -5,18 +5,18 @@ requires-python = ">=3.12"
 dependencies = [
     "aws-cdk-lib>=2.244.0,<3.0.0",
     "constructs>=10.5.0,<11.0.0",
-    "enterprise-constructs-base",
-    "enterprise-foo-construct",
-    "enterprise-bar-construct",
+    "xirokampi-constructs-base",
+    "xirokampi-foo-construct",
+    "xirokampi-bar-construct",
 ]
 
 [tool.uv.workspace]
 members = ["packages/*"]
 
 [tool.uv.sources]
-enterprise-constructs-base = { workspace = true }
-enterprise-foo-construct   = { workspace = true }
-enterprise-bar-construct   = { workspace = true }
+xirokampi-constructs-base = { workspace = true }
+xirokampi-foo-construct   = { workspace = true }
+xirokampi-bar-construct   = { workspace = true }
 
 [dependency-groups]
 dev = ["pytest>=8.0.0"]

@@ -3,9 +3,9 @@ import aws_cdk as cdk
 from aws_cdk import assertions
 from aws_cdk_bom.aws_cdk_bom_stack import AwsCdkBomStack
 from aws_cdk_bom.aspects import BomAspect
-from enterprise_constructs_base import EnterpriseConstruct
-from enterprise_foo_construct import FooConstruct
-from enterprise_bar_construct import BarConstruct
+from xirokampi_constructs_base import XirokampiConstruct
+from xirokampi_foo_construct import FooConstruct
+from xirokampi_bar_construct import BarConstruct
 
 
 def make_template() -> assertions.Template:
@@ -23,38 +23,32 @@ def test_bom_metadata_exists():
 
 def test_foo_in_bom():
     constructs = make_template().to_json()["Metadata"]["BOM"]["Constructs"]
-    assert any(
-        c["name"] == "FooConstruct" and c["version"] == FooConstruct.CONSTRUCT_VERSION
-        for c in constructs
-    )
+    assert any(c["blueprint"].startswith("FooConstruct@") for c in constructs)
 
 
 def test_bar_in_bom():
     constructs = make_template().to_json()["Metadata"]["BOM"]["Constructs"]
-    assert any(
-        c["name"] == "BarConstruct" and c["version"] == BarConstruct.CONSTRUCT_VERSION
-        for c in constructs
-    )
+    assert any(c["blueprint"].startswith("BarConstruct@") for c in constructs)
 
 
 def test_bom_records_module_path():
     """The BOM records the fully-qualified module, not just the class name string."""
     constructs = make_template().to_json()["Metadata"]["BOM"]["Constructs"]
-    foo = next(c for c in constructs if c["name"] == "FooConstruct")
-    assert foo["module"] == "enterprise_foo_construct"
+    foo = next(c for c in constructs if c["blueprint"].startswith("FooConstruct@"))
+    assert foo["module"] == "xirokampi_foo_construct"
 
 
 def test_two_ssm_parameters():
     make_template().resource_count_is("AWS::SSM::Parameter", 2)
 
 
-def test_enterprise_tags_on_resources():
+def test_xirokampi_construct_tag_on_resources():
     t = make_template()
     t.has_resource_properties("AWS::SSM::Parameter", {
-        "Tags": assertions.Match.object_like({"enterprise:construct-name": "FooConstruct"})
+        "Tags": assertions.Match.object_like({"xirokampi:construct": assertions.Match.string_like_regexp("^FooConstruct@")})
     })
     t.has_resource_properties("AWS::SSM::Parameter", {
-        "Tags": assertions.Match.object_like({"enterprise:construct-name": "BarConstruct"})
+        "Tags": assertions.Match.object_like({"xirokampi:construct": assertions.Match.string_like_regexp("^BarConstruct@")})
     })
 
 
@@ -69,13 +63,11 @@ def test_unapproved_construct_raises():
 
 
 def test_spoof_attempt_is_caught():
-    """A construct that lies about its CONSTRUCT_NAME/VERSION is caught because
-    BomAspect checks type identity, not the name/version strings."""
+    """A construct that inherits from XirokampiConstruct is caught because
+    BomAspect checks type identity, not the blueprint string."""
 
-    class NaughtyConstruct(EnterpriseConstruct):
-        CONSTRUCT_NAME    = "FooConstruct"  # lying
-        CONSTRUCT_VERSION = "1.0.0"         # lying
-
+    class NaughtyConstruct(XirokampiConstruct):
+        # blueprint_id will be "NaughtyConstruct@unknown" — derived automatically
         def __init__(self, scope, construct_id, **kwargs):
             super().__init__(scope, construct_id, **kwargs)
 
