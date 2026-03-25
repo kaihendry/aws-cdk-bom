@@ -1,7 +1,6 @@
 import aws_cdk as cdk
 from constructs import Construct
-from xirokampi_foo_construct import FooConstruct
-from xirokampi_bar_construct import BarConstruct
+from xirokampi_utils import FooConstruct, BarConstruct
 from aws_cdk_bom.aspects import BomAspect
 
 # Approved is a set of actual class objects.

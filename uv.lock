@@ -5,9 +5,8 @@ requires-python = ">=3.12"
 [manifest]
 members = [
     "aws-cdk-bom",
-    "xirokampi-bar-construct",
     "xirokampi-constructs-base",
-    "xirokampi-foo-construct",
+    "xirokampi-utils",
 ]
 
 [[package]]
@@ -54,9 +53,8 @@ source = { virtual = "." }
 dependencies = [
     { name = "aws-cdk-lib" },
     { name = "constructs" },
-    { name = "xirokampi-bar-construct" },
     { name = "xirokampi-constructs-base" },
-    { name = "xirokampi-foo-construct" },
+    { name = "xirokampi-utils" },
 ]
 
 [package.dev-dependencies]
@@ -68,9 +66,8 @@ dev = [
 requires-dist = [
     { name = "aws-cdk-lib", specifier = ">=2.244.0,<3.0.0" },
     { name = "constructs", specifier = ">=10.5.0,<11.0.0" },
-    { name = "xirokampi-bar-construct", editable = "packages/xirokampi-bar-construct" },
     { name = "xirokampi-constructs-base", editable = "packages/xirokampi-constructs-base" },
-    { name = "xirokampi-foo-construct", editable = "packages/xirokampi-foo-construct" },
+    { name = "xirokampi-utils", editable = "packages/xirokampi-utils" },
 ]
 
 [package.metadata.requires-dev]
@@ -272,21 +269,6 @@ wheels = [
 ]
 
 [[package]]
-name = "xirokampi-bar-construct"
-version = "2.1.1"
-source = { editable = "packages/xirokampi-bar-construct" }
-dependencies = [
-    { name = "aws-cdk-lib" },
-    { name = "xirokampi-constructs-base" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aws-cdk-lib", specifier = ">=2.244.0,<3.0.0" },
-    { name = "xirokampi-constructs-base", editable = "packages/xirokampi-constructs-base" },
-]
-
-[[package]]
 name = "xirokampi-constructs-base"
 version = "0.1.0"
 source = { editable = "packages/xirokampi-constructs-base" }
@@ -302,9 +284,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "xirokampi-foo-construct"
+name = "xirokampi-utils"
 version = "1.0.0"
-source = { editable = "packages/xirokampi-foo-construct" }
+source = { editable = "packages/xirokampi-utils" }
 dependencies = [
     { name = "aws-cdk-lib" },
     { name = "xirokampi-constructs-base" },

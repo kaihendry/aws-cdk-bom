@@ -1,8 +1,0 @@
-[project]
-name = "xirokampi-foo-construct"
-version = "1.0.0"
-requires-python = ">=3.12"
-dependencies = [
-    "aws-cdk-lib>=2.244.0,<3.0.0",
-    "xirokampi-constructs-base",
-]

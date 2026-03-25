@@ -6,8 +6,7 @@ dependencies = [
     "aws-cdk-lib>=2.244.0,<3.0.0",
     "constructs>=10.5.0,<11.0.0",
     "xirokampi-constructs-base",
-    "xirokampi-foo-construct",
-    "xirokampi-bar-construct",
+    "xirokampi-utils",
 ]
 
 [tool.uv.workspace]
@@ -15,8 +14,7 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 xirokampi-constructs-base = { workspace = true }
-xirokampi-foo-construct   = { workspace = true }
-xirokampi-bar-construct   = { workspace = true }
+xirokampi-utils           = { workspace = true }
 
 [dependency-groups]
 dev = ["pytest>=8.0.0"]

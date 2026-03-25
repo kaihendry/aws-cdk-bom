@@ -4,8 +4,7 @@ from aws_cdk import assertions
 from aws_cdk_bom.aws_cdk_bom_stack import AwsCdkBomStack
 from aws_cdk_bom.aspects import BomAspect
 from xirokampi_constructs_base import XirokampiConstruct
-from xirokampi_foo_construct import FooConstruct
-from xirokampi_bar_construct import BarConstruct
+from xirokampi_utils import FooConstruct, BarConstruct
 
 
 def make_template() -> assertions.Template:
@@ -35,7 +34,7 @@ def test_bom_records_module_path():
     """The BOM records the fully-qualified module, not just the class name string."""
     constructs = make_template().to_json()["Metadata"]["BOM"]["Constructs"]
     foo = next(c for c in constructs if c["blueprint"].startswith("FooConstruct@"))
-    assert foo["module"] == "xirokampi_foo_construct"
+    assert foo["module"] == "xirokampi_utils"
 
 
 def test_two_ssm_parameters():
