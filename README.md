@@ -28,19 +28,19 @@ Each Xirokampi construct is its own Python package. The version lives in exactly
 one place — `pyproject.toml` — and propagates automatically at import time:
 
 ```
-packages/xirokampi-foo-construct/pyproject.toml
+packages/xirokampi-utils/pyproject.toml
   [project]
-  name    = "xirokampi-foo-construct"
+  name    = "xirokampi-utils"
   version = "1.0.0"            ← single source of truth
         │
         │  uv sync  (installs the package into .venv)
         ▼
-  importlib.metadata.version("xirokampi-foo-construct")  → "1.0.0"
+  importlib.metadata.version("xirokampi-utils")  → "1.0.0"
         │
         ▼
   XirokampiConstruct.__init__  (base class, zero boilerplate in subclass)
     pkg  = type(self).__module__.split(".")[0].replace("_", "-")
-           # "xirokampi_foo_construct" → "xirokampi-foo-construct"
+           # "xirokampi_utils" → "xirokampi-utils"
     ver  = importlib.metadata.version(pkg)  → "1.0.0"
     self.construct_id = "FooConstruct@1.0.0"
         │
@@ -73,11 +73,12 @@ packages/xirokampi-foo-construct/pyproject.toml
 Edit `pyproject.toml`, re-sync, re-deploy — nothing else to touch:
 
 ```
-1. packages/xirokampi-bar-construct/pyproject.toml:  version = "2.1.1" → "2.2.0"
+1. packages/xirokampi-utils/pyproject.toml:  version = "1.0.0" → "1.1.0"
 2. make install          # uv rebuilds and reinstalls the package
-3. XirokampiConstruct base class re-derives construct_id at import time → "BarConstruct@2.2.0"
-4. make deploy           # BOM in the live template shows "2.2.0"
-                         # xirokampi:construct tag on every Bar resource updated
+3. XirokampiConstruct base class re-derives construct_id at import time
+                         → "FooConstruct@1.1.0", "BarConstruct@1.1.0"
+4. make deploy           # BOM in the live template shows "1.1.0"
+                         # xirokampi:construct tag on every resource updated
 ```
 
 ### BOM enforcement (validation)
@@ -207,6 +208,124 @@ cfn.CfnGuardHook(self, "XirokampiGuardHook",
 
 ---
 
+## What Org policies can and cannot check
+
+SCPs evaluate **IAM condition keys on the API call** — request tags, principal
+ARN, region. They have no access to the template body. The table below shows
+what each enforcement layer can actually see:
+
+| What you want to verify | SCP | Guard Hook | Config rule |
+|---|---|---|---|
+| `BomAspect` ran at all | ✓ (`xirokampi:validated` tag) | ✓ | ✓ |
+| BOM is non-empty (`Count > 0`) | ✗ | ✓ | ✓ (post-deploy) |
+| Constructs came from `xirokampi_utils` | ✗ | ✓ | ✓ (post-deploy) |
+| The BOM wasn't hand-written | ✗ | ✗ | ✗ |
+
+**The SCP only proves `BomAspect` ran — not which constructs it found.**
+A stack with `BomAspect(approved=set())` passes the SCP (trivially zero
+constructs to validate), stamps the tag, and deploys with no Xirokampi
+constructs at all.
+
+The only way to close that gap server-side without trusting the template is to
+**restrict `cloudformation:CreateStack` to a governed CI/CD role**. The pipeline
+then guarantees CDK + BomAspect ran correctly, and server-side checks become
+belt-and-braces rather than the primary control.
+
+---
+
+## Auditing: who used which constructs (best effort)
+
+Neither AWS Organizations nor CloudFormation have a built-in BOM registry.
+The following are best-effort approaches using existing AWS tooling.
+
+### For the Xirokampi Platform team
+
+The `xirokampi:construct` tag is applied to **every AWS resource** created by a
+Xirokampi construct. This is the most useful audit signal because it persists on
+the resource even if the stack is updated or the BOM metadata changes.
+
+**Tag Editor (console)** — cross-account, cross-region search:
+```
+AWS Console → Resource Groups & Tag Editor → Tag Editor
+  Tag key:   xirokampi:construct
+  Tag value: (leave blank to find all, or "FooConstruct@1.0.0" for a specific version)
+  Regions:   all
+  Resource types: all
+```
+This gives a flat list of every resource under Xirokampi management, grouped by
+construct version. Useful for answering "which data products are still on
+`FooConstruct@1.0.0` and need upgrading?"
+
+**Per-stack BOM query** — requires access to each account:
+```bash
+# List all stacks with the validated tag in an account
+aws cloudformation describe-stacks \
+  --query "Stacks[?Tags[?Key=='xirokampi:validated'&&Value=='true']].StackName"
+
+# Pull the full BOM from a specific stack
+aws cloudformation get-template \
+  --stack-name <StackName> \
+  --query 'TemplateBody.Metadata.BOM' \
+  --output json
+```
+
+**Cost Explorer** — filter costs by construct:
+```
+AWS Cost Explorer → Filter by Tag → xirokampi:construct
+```
+Shows spend attributable to each construct version across all data products.
+
+### For the Org admin
+
+The Org admin typically has read access across accounts via AWS Organizations
+but does not control the Xirokampi platform.
+
+**AWS Config Aggregator** — query tag compliance across all member accounts:
+```sql
+-- AWS Config Advanced Query (aggregator)
+SELECT
+  accountId, awsRegion, resourceId, resourceName,
+  tags.value AS construct_version
+WHERE
+  resourceType = 'AWS::CloudFormation::Stack'
+  AND tags.key = 'xirokampi:validated'
+```
+This shows which accounts have deployed validated stacks, but not the construct
+breakdown — the BOM metadata is not queryable via Config.
+
+**CloudTrail** — who deployed what and when:
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=CreateStack \
+  --query 'Events[*].{Who:Username,Stack:CloudTrailEvent}' \
+  --output table
+```
+
+### The honest picture
+
+```
+Org admin can see (without Xirokampi platform access):
+  ✓  Which accounts have stacks tagged xirokampi:validated=true
+  ✓  Which accounts have resources tagged xirokampi:construct=*
+  ✓  Who deployed what, when (CloudTrail)
+  ✗  Which specific construct versions are deployed where
+  ✗  Whether BOM metadata is genuine vs hand-written
+
+Xirokampi Platform team can see (with per-account access):
+  ✓  Full BOM per stack via cloudformation:GetTemplate
+  ✓  All resources by construct+version via Tag Editor
+  ✓  Cost per construct version via Cost Explorer
+  ✗  Whether the BOM was generated by BomAspect or hand-written
+```
+
+For a richer audit view, the Platform team can run a cross-account Lambda that
+iterates every account → every stack with `xirokampi:validated=true` → calls
+`GetTemplate` → aggregates `Metadata.BOM` into a central store (DynamoDB, S3,
+or a dashboard). This is outside the scope of this spike but the data is all
+there.
+
+---
+
 ## Authoritative AWS guidance
 
 The approach in this spike follows the official
@@ -276,12 +395,9 @@ aws-cdk-bom/
 │   ├── xirokampi-constructs-base/          ← shared XirokampiConstruct base class
 │   │   ├── pyproject.toml  (v0.1.0)
 │   │   └── xirokampi_constructs_base/__init__.py
-│   ├── xirokampi-foo-construct/            ← versioned Xirokampi construct
-│   │   ├── pyproject.toml  (v1.0.0)
-│   │   └── xirokampi_foo_construct/__init__.py
-│   └── xirokampi-bar-construct/            ← versioned Xirokampi construct
-│       ├── pyproject.toml  (v2.1.1)
-│       └── xirokampi_bar_construct/__init__.py
+│   └── xirokampi-utils/                    ← FooConstruct + BarConstruct (shared version)
+│       ├── pyproject.toml  (v1.0.0)
+│       └── xirokampi_utils/__init__.py
 ├── aws_cdk_bom/
 │   ├── aspects/
 │   │   └── bom_aspect.py                  ← BomAspect: validates + records BOM

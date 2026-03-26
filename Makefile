@@ -1,3 +1,5 @@
+export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION = true
+
 .PHONY: install synth test deploy bom
 
 install:
