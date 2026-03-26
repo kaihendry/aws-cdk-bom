@@ -14,8 +14,5 @@ test:
 deploy:
 	uv run cdk deploy
 
-bom:
-	aws cloudformation get-template \
-	  --stack-name AwsCdkBomStack \
-	  --query 'TemplateBody.Metadata.BOM' \
-	  --output json
+bom: synth
+	python3 -c "import json,sys; t=json.load(open('cdk.out/AwsCdkBomStack.template.json')); print(json.dumps(t['Metadata']['BOM'], indent=4))"

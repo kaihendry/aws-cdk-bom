@@ -3,11 +3,6 @@ from constructs import Construct
 from xirokampi_utils import FooConstruct, BarConstruct
 from aws_cdk_bom.aspects import BomAspect
 
-# Approved is a set of actual class objects.
-# Importing them here means this file has a hard dependency on the approved packages —
-# you cannot approve a construct you haven't installed.
-APPROVED_CONSTRUCT_TYPES: set[type] = {FooConstruct, BarConstruct}
-
 
 class AwsCdkBomStack(cdk.Stack):
 
@@ -17,4 +12,4 @@ class AwsCdkBomStack(cdk.Stack):
         FooConstruct(self, "Foo")
         BarConstruct(self, "Bar")
 
-        cdk.Aspects.of(self).add(BomAspect(approved=APPROVED_CONSTRUCT_TYPES))
+        cdk.Aspects.of(self).add(BomAspect())

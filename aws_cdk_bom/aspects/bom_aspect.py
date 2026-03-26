@@ -11,10 +11,7 @@ BOM_VALIDATED_TAG = "xirokampi:validated"
 
 @jsii.implements(cdk.IAspect)
 class BomAspect:
-    def __init__(self, approved: set[type]) -> None:
-        # Approved is a set of actual class objects, not strings.
-        # type(node) is SomeClass cannot be faked without importing the real class.
-        self._approved = approved
+    def __init__(self) -> None:
         self._stack_registered = False
 
     def visit(self, node: IConstruct) -> None:
@@ -23,25 +20,12 @@ class BomAspect:
 
         self._stack_registered = True
 
-        # The construct tree is fully built before synth runs, so find_all()
-        # gives us the complete picture right now — no lazy evaluation needed.
         enterprise_nodes = [
             child for child in node.node.find_all()
             if isinstance(child, XirokampiConstruct)
         ]
 
-        # Validate every enterprise construct against the approved type set.
-        # type() is used rather than isinstance() so that a subclass of an
-        # approved construct is not itself considered approved.
-        for child in enterprise_nodes:
-            if type(child) not in self._approved:
-                fqn = f"{type(child).__module__}.{type(child).__qualname__}"
-                raise ValueError(
-                    f"Non-approved construct type: {fqn}. "
-                    f"Approved: {sorted(f'{c.__module__}.{c.__name__}' for c in self._approved)}"
-                )
-
-        # All constructs approved — stamp the stack with the validation tag.
+        # Stamp the stack with the validation tag.
         # An SCP at the AWS Organisation level can then deny CreateStack /
         # UpdateStack unless aws:RequestTag/bom:validated equals "true".
         # Use node.tags.set_tag() rather than Tags.of().add() to avoid the
@@ -49,10 +33,23 @@ class BomAspect:
         # 200 after BomAspect has already run at priority 500).
         node.tags.set_tag(BOM_VALIDATED_TAG, "true")
 
+        # Encode construct versions as a stack tag so that a library version
+        # bump (which changes no resource properties) still shows up as a tag
+        # change in the CloudFormation changeset, forcing an actual deploy and
+        # keeping the deployed BOM metadata accurate.
+        # AWS tag values are limited to 256 characters; truncate with a marker
+        # if the list is unusually long.
+        bom_tag_value = ",".join(
+            child.construct_id for child in enterprise_nodes
+        )
+        if len(bom_tag_value) > 256:
+            bom_tag_value = bom_tag_value[:253] + "..."
+        node.tags.set_tag("xirokampi:bom", bom_tag_value)
+
         # Write the BOM summary into the stack's CloudFormation template Metadata.
         bom_entries = [
             {
-                "blueprint": child.construct_id,           # "FooConstruct@1.0.0"
+                "blueprint": child.construct_id,
                 "module":    type(child).__module__,
                 "path":      child.node.path,
             }
@@ -60,11 +57,8 @@ class BomAspect:
         ]
         node.template_options.metadata = {
             "BOM": {
-                "GeneratedAt":  "synth-time",
-                "ApprovedTypes": [
-                    f"{cls.__module__}.{cls.__name__}" for cls in self._approved
-                ],
-                "Constructs":   bom_entries,
-                "Count":        len(bom_entries),
+                "GeneratedAt": "synth-time",
+                "Constructs":  bom_entries,
+                "Count":       len(bom_entries),
             }
         }

@@ -366,7 +366,45 @@ enforcement mechanism."*
 
 ## Limitations
 
-`BomAspect` only detects constructs that subclass `XirokampiConstruct`. Standard
+### BOM reflects last resource change, not latest library version
+
+CloudFormation changesets only track **resource** changes. Template-level
+`Metadata` (where the BOM lives) is invisible to the changeset engine — if a
+library version bumps but no resource properties change, CloudFormation reports
+"no changes" and skips the deploy. The deployed BOM then still shows the
+previous version.
+
+This is actually useful information: **the BOM version is the version that last
+had a material impact on the deployed resources**, not merely the version that
+was installed at the time of the last `cdk deploy`. A bump from
+`FooConstruct@1.0.0` to `1.0.1` that only fixes a docstring genuinely did not
+change anything in the account — the BOM accurately reflects that `1.0.0` is
+what shaped the infrastructure.
+
+**`BomAspect` works around this** by also writing construct versions into the
+`xirokampi:bom` stack tag (e.g. `FooConstruct@1.0.0,BarConstruct@1.0.0`).
+Stack tags live in the CloudFormation changeset — not just the template — so
+any version bump changes the tag, CloudFormation detects a real change, and the
+deploy proceeds. The deployed BOM metadata then stays accurate.
+
+The corollary: if you need the BOM to reflect the *currently installed* version
+regardless of resource impact, read from the local synthesis output instead of
+the deployed stack:
+
+```bash
+# Always current — reflects the code on disk right now
+make bom          # reads cdk.out/ after re-synth
+
+# Historical — reflects the last deploy that changed a resource
+aws cloudformation get-template \
+  --stack-name AwsCdkBomStack \
+  --query 'TemplateBody.Metadata.BOM' \
+  --output json
+```
+
+### BomAspect only detects XirokampiConstruct subclasses
+
+Standard
 L2/L3 constructs from `aws-cdk-lib` or third-party libraries are invisible to it:
 
 ```
