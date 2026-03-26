@@ -39,7 +39,7 @@ class BomAspect:
         # keeping the deployed BOM metadata accurate.
         # AWS tag values are limited to 256 characters; truncate with a marker
         # if the list is unusually long.
-        bom_tag_value = ",".join(
+        bom_tag_value = " ".join(
             child.construct_id for child in enterprise_nodes
         )
         if len(bom_tag_value) > 256:
