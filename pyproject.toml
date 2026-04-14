@@ -17,4 +17,4 @@ xirokampi-constructs-base = { workspace = true }
 xirokampi-utils           = { workspace = true }
 
 [dependency-groups]
-dev = ["pytest>=8.0.0"]
+dev = ["pytest>=9.0.3"]
